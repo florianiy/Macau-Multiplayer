@@ -143,15 +143,6 @@ public class GameLobby extends Application {
             }
         top_hbox.getChildren().add(deck_ui);
 
-//        var deck_of_cards = this.getImageView("/cards/deck_of_cards.png");
-//        deck_of_cards.setOnMouseClicked(event -> {
-//            var let = new Letter();
-//            let.action = "draw";
-//            this.gameClient.send(this.ToJson(let));
-//        });
-//        top_hbox.getChildren().add(deck_of_cards);
-
-
         try {
             this.gameClient = new GameClient(12334);
             this.gameClient.setOnMessageListener((json) -> {
