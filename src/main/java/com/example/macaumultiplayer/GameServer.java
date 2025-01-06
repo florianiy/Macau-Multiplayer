@@ -53,6 +53,7 @@ public class GameServer extends WebSocketServer {
             letter.your_id = player.id;
             letter.top_card = this.getTopCard();
             letter.cards = player.cards;
+            letter.CardsDeckLeft = this.deck.getDeckSize();
             letter.player_turn = this.curr_player;
 
            for(var other: this.players){

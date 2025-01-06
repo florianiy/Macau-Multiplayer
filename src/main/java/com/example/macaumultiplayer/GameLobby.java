@@ -1,24 +1,23 @@
 package com.example.macaumultiplayer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Region;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
-import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.ArrayList;
 import java.util.Objects;
 
 public class GameLobby extends Application {
@@ -46,45 +45,72 @@ public class GameLobby extends Application {
         }
     }
 
+    public ImageView getImageView(String url) {
+        Image image = new Image(getClass().getResource(url).toExternalForm());
+        ImageView imageView = new ImageView(image);
+        imageView.setFitWidth(70);
+        imageView.setPreserveRatio(true);
+        imageView.setCache(true);
+        return imageView;
+    }
+
+    public ImageView getCardImage(ArrayList<String> card) {
+        return this.getImageView("/cards/" + card.get(0) + "_of_" + card.get(1) + ".png");
+    }
+
+    Text playerText;
+    HBox top_hbox;
+    VBox AllCards;
+
+    Pane  deck_ui;
+    Integer LastDeckAmount = 50;
+
     public void UpdateGame(Letter letter) {
         if (!Objects.equals(letter.action, "update-state"))
             return;
 
-        this.root.getChildren().clear();
-
-        this.root.getChildren().add(new Text("Привет мирid: " + letter.your_id));
-
-        this.root.getChildren().add(new Button(String.join(" ", letter.top_card)));
-
-
-        var drawCard = new Button("draw card");
-        drawCard.setOnAction(event -> {
-            var let = new Letter();
-            let.action = "draw";
-            this.gameClient.send(this.ToJson(let));
-        });
-        this.root.getChildren().add(drawCard);
+        // add this player id
+        playerText.setText("Let's Go <" + letter.your_id + ">");
+        // topcard
+        top_hbox.getChildren().set(0, this.getCardImage(letter.top_card));
 
 
-        for (var card : letter.cards) {
+        while(this.deck_ui.getChildren().size() >= letter.CardsDeckLeft){
+            this.deck_ui.getChildren().remove(letter.CardsDeckLeft -1);
+        }
 
+        AllCards.getChildren().clear();
+
+        // card hbox
+        Pane pane  = new Pane();
+        AllCards.getChildren().add(pane);
+        for (int i =0;i<letter.cards.size();i++ ) {
+            var card = letter.cards.get(i);
             if (card == null) break;
-            Button _card = new Button(String.join(" ", card));
+            var imageView = this.getCardImage(card);
+            imageView.setLayoutX(i* 40);
+            pane.getChildren().add(imageView);
 
-            this.root.getChildren().add(_card);
-            _card.setOnAction(e -> {
+            imageView.setOnMouseClicked(e -> {
                 System.out.println(card);
                 var let = new Letter();
                 let.action = "give";
                 let.cards.add(card);
                 this.gameClient.send(this.ToJson(let));
-                this.root.getChildren().remove(_card);
+                pane.getChildren().remove(imageView);
             });
         }
 
         for (var player : letter.players) {
-            Text _asd = new Text(player.cards_left + " -- player:" + player.player_id);
-            this.root.getChildren().add(_asd);
+            Pane fp = new Pane();
+            for(int i=0;i<player.cards_left;i++){
+                var hiddenCard = this.getImageView("/cards/hidden-card.png");
+                hiddenCard.setLayoutX(i*15);
+                fp.getChildren().add(hiddenCard);
+            }
+
+            Text _asd = new Text("player: " + player.player_id);
+            this.AllCards.getChildren().addAll(_asd, fp);
         }
     }
 
@@ -92,6 +118,39 @@ public class GameLobby extends Application {
         root = new VBox(10);
         this.Game = new Scene(root, 500, 400, Color.LIGHTGRAY);
         this.Game.getRoot().setStyle("-fx-font-family: 'serif'");
+        this.playerText = new Text("player: undefined");
+        this.top_hbox = new HBox();
+        this.AllCards = new VBox();
+        this.root.getChildren().addAll(this.playerText, this.top_hbox, this.AllCards);
+
+
+        // tophbox
+        var card = new ArrayList<String>();
+        card.add("ace"); card.add("hearts");
+        top_hbox.getChildren().add(this.getCardImage(card));
+        // deck of cards where player can draw cards
+             deck_ui = new Pane();
+            for(int i=0;i<this.LastDeckAmount;i++){
+                var hiddenCard = this.getImageView("/cards/hidden-card.png");
+                hiddenCard.setLayoutX(i*2.5);
+                hiddenCard.setLayoutY(-i*0.5);
+                hiddenCard.setOnMouseClicked(event -> {
+                    var let = new Letter();
+                    let.action = "draw";
+                    this.gameClient.send(this.ToJson(let));
+                });
+                deck_ui.getChildren().add(hiddenCard);
+            }
+        top_hbox.getChildren().add(deck_ui);
+
+//        var deck_of_cards = this.getImageView("/cards/deck_of_cards.png");
+//        deck_of_cards.setOnMouseClicked(event -> {
+//            var let = new Letter();
+//            let.action = "draw";
+//            this.gameClient.send(this.ToJson(let));
+//        });
+//        top_hbox.getChildren().add(deck_of_cards);
+
 
         try {
             this.gameClient = new GameClient(12334);
