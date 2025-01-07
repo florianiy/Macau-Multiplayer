@@ -149,14 +149,26 @@ public class GameServer extends WebSocketServer {
 
             if(are_same_rank && is_compatible_hand){
 
-                var skipPlayers = are_compatible_cards.test(this.ace, _card);
+                var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
                 for(var card: given_cards) {
                     _player.cards.remove(card);
                     this.table.add(card);
                     if(skipPlayers) this.SetNextPlayer();
+
                 }
 
                 this.SetNextPlayer();
+
+                if(_player.cards.isEmpty()) {
+                    this.curr_player = i;
+                    this.deck.reset();
+                    this.table.clear();
+                    this.table.add(this.deck.drawCard());
+                    for(var player : this.players){
+                        player.cards = this.deck.drawCards(5);
+                    }
+                }
+
             }
         }
 
