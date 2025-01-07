@@ -39,8 +39,8 @@ public class GameServer extends WebSocketServer {
 
     ObjectMapper objectMapper = new ObjectMapper();
     private final ArrayList<String> ace;
-//    private ArrayList<String> four;
-
+    //    private ArrayList<String> four;
+    private Integer umflaturi = 0;
 
     public GameServer(int port) {
         super(new InetSocketAddress(port));
@@ -146,32 +146,53 @@ public class GameServer extends WebSocketServer {
             boolean are_same_rank = true;
             boolean is_compatible_hand = are_compatible_cards.test(top_card, _card);
             for (var card : given_cards) {
-                if (!Objects.equals(_card.get(0), card.get(0))){are_same_rank= false; break;}
+                if (!Objects.equals(_card.get(0), card.get(0))) {
+                    are_same_rank = false;
+                    break;
+                }
             }
 
 
+            var has_umflaturi = Objects.equals(_card.get(0), "2") || Objects.equals(_card.get(0), "3");
+            var has_blocker = Objects.equals(_card.get(0), "4");
             // cards are ok => remove and update
-            if(are_same_rank && is_compatible_hand){
-                var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
-                for(var card: given_cards) {
-                    _player.cards.remove(card);
-                    this.table.add(card);
-                    if(skipPlayers) this.SetNextPlayer();
+
+
+            if (are_same_rank) {
+
+
+                if (has_umflaturi) {
+                    this.umflaturi += Integer.parseInt(_card.get(0)) * given_cards.size();
+                } else if (has_blocker) {
+                    this.umflaturi = 0;
                 }
 
-                this.SetNextPlayer();
+                if (this.umflaturi > 0 && !has_umflaturi && !has_blocker) {
+                    _player.cards.addAll(this.deck.drawCards(this.umflaturi));
+                    this.umflaturi = 0;
+                    this.SetNextPlayer();
 
-                // player sent all his cards => player won
-                if(_player.cards.isEmpty()) {
-                    this.curr_player = i;
-                    this.deck.reset();
-                    this.table.clear();
-                    this.table.add(this.deck.drawCard());
-                    for(var player : this.players){
-                        player.cards = this.deck.drawCards(5);
+                } else if (is_compatible_hand || has_umflaturi || has_blocker){
+                    var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
+                    for (var card : given_cards) {
+                        _player.cards.remove(card);
+                        this.table.add(card);
+                        if (skipPlayers) this.SetNextPlayer();
+                    }
+
+                    this.SetNextPlayer();
+
+                    // player sent all his cards => player won
+                    if (_player.cards.isEmpty()) {
+                        this.curr_player = i;
+                        this.deck.reset();
+                        this.table.clear();
+                        this.table.add(this.deck.drawCard());
+                        for (var player : this.players) {
+                            player.cards = this.deck.drawCards(5);
+                        }
                     }
                 }
-
             }
         }
 
