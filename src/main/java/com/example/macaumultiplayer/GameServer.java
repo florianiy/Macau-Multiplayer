@@ -59,8 +59,6 @@ public class GameServer extends WebSocketServer {
     }
 
     public void UpdateClientsState() {
-
-
         for (var player : this.players) {
             Letter letter = new Letter();
             letter.action = "update-state";
@@ -131,13 +129,17 @@ public class GameServer extends WebSocketServer {
             return;
         }
 
+
         if (Objects.equals(letter.action, "draw")) {
             _player.cards.add(this.deck.drawCard());
             this.SetNextPlayer();
-        } else if (Objects.equals(letter.action, "give")) {
+        }
+
+        if (Objects.equals(letter.action, "give")) {
             BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
                     Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
 
+            // test if cards send are legal to be given
             var given_cards = letter.cards;
             var top_card = this.getTopCard();
             var _card = given_cards.get(0);
@@ -147,18 +149,19 @@ public class GameServer extends WebSocketServer {
                 if (!Objects.equals(_card.get(0), card.get(0))){are_same_rank= false; break;}
             }
 
-            if(are_same_rank && is_compatible_hand){
 
+            // cards are ok => remove and update
+            if(are_same_rank && is_compatible_hand){
                 var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
                 for(var card: given_cards) {
                     _player.cards.remove(card);
                     this.table.add(card);
                     if(skipPlayers) this.SetNextPlayer();
-
                 }
 
                 this.SetNextPlayer();
 
+                // player sent all his cards => player won
                 if(_player.cards.isEmpty()) {
                     this.curr_player = i;
                     this.deck.reset();

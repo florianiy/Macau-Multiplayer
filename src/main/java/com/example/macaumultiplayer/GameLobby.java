@@ -52,6 +52,19 @@ public class GameLobby extends Application {
         imageView.setFitWidth(70);
         imageView.setPreserveRatio(true);
         imageView.setCache(true);
+        imageView.setOnMouseEntered(event -> {
+            if (imageView.getScaleY() == 1) {
+                imageView.setScaleY(1.2);
+                imageView.setScaleX(1.2);
+            }
+
+        });
+
+        imageView.setOnMouseExited(event -> {
+            if (imageView.getScaleY() > 1) imageView.setScaleY(1);
+            imageView.setScaleX(1);
+        });
+
         return imageView;
     }
 
@@ -63,7 +76,7 @@ public class GameLobby extends Application {
     HBox top_hbox;
     VBox AllCards;
 
-    Pane  deck_ui;
+    Pane deck_ui;
     Integer LastDeckAmount = 50;
     Boolean isMyTurn = false;
 
@@ -76,8 +89,13 @@ public class GameLobby extends Application {
 
         this.isMyTurn = Objects.equals(letter.player_turn, letter.your_id);
 
-        this.root.setOpacity(1);
-        if(!this.isMyTurn) this.root.setOpacity(0.5);
+        var hue = new ColorAdjust();
+        hue.setHue(0);
+        this.root.setEffect(hue);
+        if (!this.isMyTurn) {
+            hue.setHue(0.1);
+            this.root.setEffect(hue);
+        }
 
         // add this player id
         playerText.setText("Let's Go <" + letter.your_id + ">");
@@ -85,44 +103,43 @@ public class GameLobby extends Application {
         top_hbox.getChildren().set(0, this.getCardImage(letter.top_card));
 
 
-        while(this.deck_ui.getChildren().size() >= letter.CardsDeckLeft){
-            this.deck_ui.getChildren().remove(letter.CardsDeckLeft -1);
+        while (this.deck_ui.getChildren().size() >= letter.CardsDeckLeft) {
+            this.deck_ui.getChildren().remove(letter.CardsDeckLeft - 1);
         }
 
         AllCards.getChildren().clear();
 
         // card hbox
-        Pane pane  = new Pane();
+        Pane pane = new Pane();
         AllCards.getChildren().add(pane);
-        for (int i =0;i<letter.cards.size();i++ ) {
+        for (int i = 0; i < letter.cards.size(); i++) {
             var card = letter.cards.get(i);
             if (card == null) break;
             var imageView = this.getCardImage(card);
-            imageView.setLayoutX(i* 40);
+            imageView.setLayoutX(i * 40);
             pane.getChildren().add(imageView);
 
 
-
             imageView.setOnMouseClicked(event -> {
-                if(!this.isMyTurn) return;
-                if(event.isControlDown()){
+                if (!this.isMyTurn) return;
+                if (event.isControlDown()) {
                     cardSenderLetter.cards.add(card);
-                    imageView.setScaleY(0.6);
-                }
-                else{
-                    cardSenderLetter.cards.add(card);
+                } else {
+                    // prevent duplicate send of same card
+                    if(imageView.getScaleY() != 0.6) cardSenderLetter.cards.add(card);
                     this.gameClient.send(this.ToJson(cardSenderLetter));
                     cardSenderLetter.cards.clear();
-                    pane.getChildren().remove(imageView);
                 }
+                imageView.setScaleY(0.6);
+
             });
         }
 
         for (var player : letter.players) {
             Pane fp = new Pane();
-            for(int i=0;i<player.cards_left;i++){
+            for (int i = 0; i < player.cards_left; i++) {
                 var hiddenCard = this.getImageView("/cards/hidden-card.png");
-                hiddenCard.setLayoutX(i*15);
+                hiddenCard.setLayoutX(i * 15);
                 fp.getChildren().add(hiddenCard);
             }
 
@@ -145,22 +162,23 @@ public class GameLobby extends Application {
         this.cardSenderLetter.action = "give";
         // tophbox
         var card = new ArrayList<String>();
-        card.add("ace"); card.add("hearts");
+        card.add("ace");
+        card.add("hearts");
         top_hbox.getChildren().add(this.getCardImage(card));
         // deck of cards where player can draw cards
-             deck_ui = new Pane();
-            for(int i=0;i<this.LastDeckAmount;i++){
-                var hiddenCard = this.getImageView("/cards/hidden-card.png");
-                hiddenCard.setLayoutX(i*2.5);
-                hiddenCard.setLayoutY(-i*0.5);
-                hiddenCard.setOnMouseClicked(event -> {
-                    if(!this.isMyTurn) return;
-                    var let = new Letter();
-                    let.action = "draw";
-                    this.gameClient.send(this.ToJson(let));
-                });
-                deck_ui.getChildren().add(hiddenCard);
-            }
+        deck_ui = new Pane();
+        for (int i = 0; i < this.LastDeckAmount; i++) {
+            var hiddenCard = this.getImageView("/cards/hidden-card.png");
+            hiddenCard.setLayoutX(i * 2.5);
+            hiddenCard.setLayoutY(-i * 0.5);
+            hiddenCard.setOnMouseClicked(event -> {
+                if (!this.isMyTurn) return;
+                var let = new Letter();
+                let.action = "draw";
+                this.gameClient.send(this.ToJson(let));
+            });
+            deck_ui.getChildren().add(hiddenCard);
+        }
         top_hbox.getChildren().add(deck_ui);
 
         try {
