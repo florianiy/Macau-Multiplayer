@@ -4,14 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.effect.ColorAdjust;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
@@ -144,7 +142,12 @@ public class GameLobby extends Application {
             }
 
             Text _asd = new Text("player: " + player.player_id);
-            this.AllCards.getChildren().addAll(_asd, fp);
+            StackPane hugger = new StackPane();
+            hugger.setAlignment(_asd, Pos.CENTER_LEFT);
+            hugger.getChildren().addAll(fp, _asd);
+
+
+            this.AllCards.getChildren().add(hugger);
         }
     }
 

@@ -131,7 +131,13 @@ public class GameServer extends WebSocketServer {
 
 
         if (Objects.equals(letter.action, "draw")) {
-            _player.cards.add(this.deck.drawCard());
+            if (this.umflaturi > 0) {
+                _player.cards.addAll(this.deck.drawCards(this.umflaturi));
+                this.umflaturi = 0;
+            }
+            else {
+                _player.cards.add(this.deck.drawCard());
+            }
             this.SetNextPlayer();
         }
 
@@ -172,7 +178,7 @@ public class GameServer extends WebSocketServer {
                     this.umflaturi = 0;
                     this.SetNextPlayer();
 
-                } else if (is_compatible_hand || has_umflaturi || has_blocker){
+                } else if (is_compatible_hand || has_umflaturi || has_blocker) {
                     var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
                     for (var card : given_cards) {
                         _player.cards.remove(card);
@@ -196,6 +202,16 @@ public class GameServer extends WebSocketServer {
             }
         }
 
+        var next_player = this.players.get(this.curr_player);
+        if(this.umflaturi >0&& next_player.cards.stream().noneMatch(card->
+                Objects.equals(card.get(0), "2")
+                || Objects.equals(card.get(0), "3")
+                || Objects.equals(card.get(0), "4")))
+        {
+            next_player.cards.addAll(this.deck.drawCards(this.umflaturi));
+            this.umflaturi = 0;
+            this.SetNextPlayer();
+        }
         this.UpdateClientsState();
     }
 
