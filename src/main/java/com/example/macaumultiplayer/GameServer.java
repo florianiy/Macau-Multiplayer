@@ -29,7 +29,12 @@ public class GameServer extends WebSocketServer {
 
     private Deck deck = new Deck();
     private ArrayList<ArrayList<String>> table = new ArrayList<>();
-    private String curr_player = ""; // not used yet
+    private Integer curr_player = 0; // not used yet
+
+    private String GetCurrPlayerId() {
+        return this.players.get(this.curr_player).id;
+    }
+
     ObjectMapper objectMapper = new ObjectMapper();
 
     public GameServer(int port) {
@@ -41,25 +46,26 @@ public class GameServer extends WebSocketServer {
         this.onStartCallback = callback;
     }
 
-    public ArrayList<String> getTopCard(){
-        return this.table.get(this.table.size()-1);
+    public ArrayList<String> getTopCard() {
+        return this.table.get(this.table.size() - 1);
     }
-    public void UpdateClientsState(){
+
+    public void UpdateClientsState() {
 
 
-        for(var player : this.players){
+        for (var player : this.players) {
             Letter letter = new Letter();
             letter.action = "update-state";
             letter.your_id = player.id;
             letter.top_card = this.getTopCard();
             letter.cards = player.cards;
             letter.CardsDeckLeft = this.deck.getDeckSize();
-            letter.player_turn = this.curr_player;
+            letter.player_turn = this.GetCurrPlayerId();
 
-           for(var other: this.players){
-             if(!Objects.equals(other.id, player.id))
-               letter.players.add(new Letter.PlayerInfo(other.id, other.cards.size()));
-           }
+            for (var other : this.players) {
+                if (!Objects.equals(other.id, player.id))
+                    letter.players.add(new Letter.PlayerInfo(other.id, other.cards.size()));
+            }
 
             String json;
             try {
@@ -76,18 +82,14 @@ public class GameServer extends WebSocketServer {
         System.out.println("New player connected: " + conn.getRemoteSocketAddress());
         var player = new Player(UUID.randomUUID().toString(), conn, this.deck.drawCards(5));
         players.add(player);
+        if (this.curr_player == -1) this.curr_player = 0;
         this.UpdateClientsState();
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         System.out.println("Player disconnected: " + conn.getRemoteSocketAddress());
-//        clients.remove(conn);
-
-        // Notify remaining clients that a player has disconnected
-//        for (WebSocket client : clients) {
-//            client.send("A player has left the game.");
-//        }
+        // handle remove player
     }
 
     @Override
@@ -101,28 +103,35 @@ public class GameServer extends WebSocketServer {
         }
 
 
-
         // get player who requested
         Player _player = null;
-        for(var player: this.players){
-            if(player.conn.equals(conn)) _player = player;
+        int i = 0;
+        for (; i < this.players.size(); i++) {
+            var player = this.players.get(i);
+            if (player.conn.equals(conn)) {
+                _player = player;
+                break;
+            }
+        }
+        if (_player == null) return;
+        if (this.curr_player != i)  {
+            this.UpdateClientsState();
+            return;
         }
 
-
-        if(Objects.equals(letter.action, "draw")){
+        this.curr_player = (this.curr_player+1)%this.players.size();
+        if (Objects.equals(letter.action, "draw")) {
             _player.cards.add(this.deck.drawCard());
-        }
-        else if(Objects.equals(letter.action, "give")){
+        } else if (Objects.equals(letter.action, "give")) {
             var given = letter.cards;
             var top_card = this.getTopCard();
-            if(given.size() == 1) {
+            if (given.size() == 1) {
                 var card = given.get(0);
-                if(Objects.equals(card.get(0), top_card.get(0)) || Objects.equals(card.get(1), top_card.get(1))) {
+                if (Objects.equals(card.get(0), top_card.get(0)) || Objects.equals(card.get(1), top_card.get(1))) {
                     _player.cards.remove(card);
                     this.table.add(card);
                 }
-            }
-            else if(given.size() > 1) {
+            } else if (given.size() > 1) {
                 // to be done
             }
         }

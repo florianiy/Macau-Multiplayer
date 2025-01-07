@@ -64,10 +64,16 @@ public class GameLobby extends Application {
 
     Pane  deck_ui;
     Integer LastDeckAmount = 50;
+    Boolean isMyTurn = false;
 
     public void UpdateGame(Letter letter) {
         if (!Objects.equals(letter.action, "update-state"))
             return;
+
+        this.isMyTurn = Objects.equals(letter.player_turn, letter.your_id);
+
+        this.root.setOpacity(1);
+        if(!this.isMyTurn) this.root.setOpacity(0.5);
 
         // add this player id
         playerText.setText("Let's Go <" + letter.your_id + ">");
@@ -92,6 +98,7 @@ public class GameLobby extends Application {
             pane.getChildren().add(imageView);
 
             imageView.setOnMouseClicked(e -> {
+                if(!this.isMyTurn) return;
                 System.out.println(card);
                 var let = new Letter();
                 let.action = "give";
@@ -115,7 +122,8 @@ public class GameLobby extends Application {
     }
 
     private void InitGame(boolean hostServer) {
-        root = new VBox(10);
+        this.root = new VBox(10);
+        this.root.setStyle("-fx-background-color: lightgray;");
         this.Game = new Scene(root, 500, 400, Color.LIGHTGRAY);
         this.Game.getRoot().setStyle("-fx-font-family: 'serif'");
         this.playerText = new Text("player: undefined");
@@ -135,6 +143,7 @@ public class GameLobby extends Application {
                 hiddenCard.setLayoutX(i*2.5);
                 hiddenCard.setLayoutY(-i*0.5);
                 hiddenCard.setOnMouseClicked(event -> {
+                    if(!this.isMyTurn) return;
                     var let = new Letter();
                     let.action = "draw";
                     this.gameClient.send(this.ToJson(let));
