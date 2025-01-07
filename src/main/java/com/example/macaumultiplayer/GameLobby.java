@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.effect.ColorAdjust;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
@@ -66,6 +67,9 @@ public class GameLobby extends Application {
     Integer LastDeckAmount = 50;
     Boolean isMyTurn = false;
 
+    Letter cardSenderLetter = new Letter();
+
+
     public void UpdateGame(Letter letter) {
         if (!Objects.equals(letter.action, "update-state"))
             return;
@@ -97,14 +101,20 @@ public class GameLobby extends Application {
             imageView.setLayoutX(i* 40);
             pane.getChildren().add(imageView);
 
-            imageView.setOnMouseClicked(e -> {
+
+
+            imageView.setOnMouseClicked(event -> {
                 if(!this.isMyTurn) return;
-                System.out.println(card);
-                var let = new Letter();
-                let.action = "give";
-                let.cards.add(card);
-                this.gameClient.send(this.ToJson(let));
-                pane.getChildren().remove(imageView);
+                if(event.isControlDown()){
+                    cardSenderLetter.cards.add(card);
+                    imageView.setScaleY(0.6);
+                }
+                else{
+                    cardSenderLetter.cards.add(card);
+                    this.gameClient.send(this.ToJson(cardSenderLetter));
+                    cardSenderLetter.cards.clear();
+                    pane.getChildren().remove(imageView);
+                }
             });
         }
 
@@ -132,6 +142,7 @@ public class GameLobby extends Application {
         this.root.getChildren().addAll(this.playerText, this.top_hbox, this.AllCards);
 
 
+        this.cardSenderLetter.action = "give";
         // tophbox
         var card = new ArrayList<String>();
         card.add("ace"); card.add("hearts");

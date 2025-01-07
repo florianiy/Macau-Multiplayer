@@ -2,6 +2,8 @@ package com.example.macaumultiplayer;
 
 import java.net.InetSocketAddress;
 import java.util.*;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,10 +38,16 @@ public class GameServer extends WebSocketServer {
     }
 
     ObjectMapper objectMapper = new ObjectMapper();
+    private final ArrayList<String> ace;
+//    private ArrayList<String> four;
+
 
     public GameServer(int port) {
         super(new InetSocketAddress(port));
         this.table.add(this.deck.drawCard());
+        this.ace = new ArrayList<String>();
+        this.ace.add("ace");
+        this.ace.add("clubs");
     }
 
     public void setOnStartCallback(Runnable callback) {
@@ -92,6 +100,10 @@ public class GameServer extends WebSocketServer {
         // handle remove player
     }
 
+    private void SetNextPlayer() {
+        this.curr_player = (this.curr_player + 1) % this.players.size();
+    }
+
     @Override
     public void onMessage(WebSocket conn, String message) {
         System.out.println("Message from player: " + message);
@@ -114,25 +126,37 @@ public class GameServer extends WebSocketServer {
             }
         }
         if (_player == null) return;
-        if (this.curr_player != i)  {
+        if (this.curr_player != i) {
             this.UpdateClientsState();
             return;
         }
 
-        this.curr_player = (this.curr_player+1)%this.players.size();
         if (Objects.equals(letter.action, "draw")) {
             _player.cards.add(this.deck.drawCard());
+            this.SetNextPlayer();
         } else if (Objects.equals(letter.action, "give")) {
-            var given = letter.cards;
+            BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
+                    Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
+
+            var given_cards = letter.cards;
             var top_card = this.getTopCard();
-            if (given.size() == 1) {
-                var card = given.get(0);
-                if (Objects.equals(card.get(0), top_card.get(0)) || Objects.equals(card.get(1), top_card.get(1))) {
+            var _card = given_cards.get(0);
+            boolean are_same_rank = true;
+            boolean is_compatible_hand = are_compatible_cards.test(top_card, _card);
+            for (var card : given_cards) {
+                if (!Objects.equals(_card.get(0), card.get(0))){are_same_rank= false; break;}
+            }
+
+            if(are_same_rank && is_compatible_hand){
+
+                var skipPlayers = are_compatible_cards.test(this.ace, _card);
+                for(var card: given_cards) {
                     _player.cards.remove(card);
                     this.table.add(card);
+                    if(skipPlayers) this.SetNextPlayer();
                 }
-            } else if (given.size() > 1) {
-                // to be done
+
+                this.SetNextPlayer();
             }
         }
 
