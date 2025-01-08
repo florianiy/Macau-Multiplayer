@@ -24,6 +24,11 @@ public class GameServer extends WebSocketServer {
             this.id = id;
             this.conn = conn;
         }
+
+        public void RemoveCards(ArrayList<ArrayList<String>> givenCards) {
+            for (var card : givenCards)
+                this.cards.remove(card);
+        }
     }
 
     private List<Player> players = new ArrayList<Player>();
@@ -105,17 +110,16 @@ public class GameServer extends WebSocketServer {
     private BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
             Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
 
-    public void HandleRequests(Letter letter, Player player, Integer index){
+    public void HandleRequests(Letter letter, Player player, Integer index) {
         if (player == null) return;
 
-        if(!Objects.equals(this.curr_player, index)) return;
+        if (!Objects.equals(this.curr_player, index)) return;
 
         if (Objects.equals(letter.action, "draw")) {
             if (this.umflaturi > 0) {
                 player.cards.addAll(this.deck.drawCards(this.umflaturi));
                 this.umflaturi = 0;
-            }
-            else {
+            } else {
                 player.cards.add(this.deck.drawCard());
             }
             this.SetNextPlayer();
@@ -123,13 +127,8 @@ public class GameServer extends WebSocketServer {
         }
 
         if (Objects.equals(letter.action, "give")) {
-
-            // test if cards send are legal to be given
             var given_cards = letter.cards;
-            var top_card = this.getTopCard();
             var _card = given_cards.get(0);
-
-            var is_compatible_hand = this.are_compatible_cards.test(top_card, _card);
 
             var are_same_rank = true;
             for (var card : given_cards) {
@@ -138,65 +137,42 @@ public class GameServer extends WebSocketServer {
                     break;
                 }
             }
+            var is_compatible_hand = this.are_compatible_cards.test(this.getTopCard(), _card);
             var has_umflaturi = are_same_rank && Objects.equals(_card.get(0), "2") || Objects.equals(_card.get(0), "3");
-            var has_blocker =  are_same_rank && Objects.equals(_card.get(0), "4");
+            var has_blocker = are_same_rank && Objects.equals(_card.get(0), "4");
 
 
+            // he gave cards after he was umflat
+            if (this.umflaturi > 0) {
+                if (has_umflaturi) this.umflaturi += Integer.parseInt(_card.get(0)) * given_cards.size();
+                if (has_blocker) this.umflaturi = 0;
+                player.RemoveCards(given_cards);
+                this.table.addAll(given_cards);
+                this.SetNextPlayer();
+                return;
+            }
 
+            // no more umflaturi
+            if (has_umflaturi) {
+                this.umflaturi += Integer.parseInt(_card.get(0)) * given_cards.size();
+                player.RemoveCards(given_cards);
+                this.table.addAll(given_cards);
+                this.SetNextPlayer();
+                return;
+            }
 
-
-            // cards are ok => remove and update
-
-
-            if (are_same_rank) {
-
-
-                if (has_umflaturi) {
-                    this.umflaturi += Integer.parseInt(_card.get(0)) * given_cards.size();
-                } else if (has_blocker) {
-                    this.umflaturi = 0;
-                }
-
-                if (this.umflaturi > 0 && !has_umflaturi && !has_blocker) {
-                    player.cards.addAll(this.deck.drawCards(this.umflaturi));
-                    this.umflaturi = 0;
-                    this.SetNextPlayer();
-
-                } else if (is_compatible_hand || has_umflaturi || has_blocker) {
-                    var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
-                    for (var card : given_cards) {
-                        player.cards.remove(card);
-                        this.table.add(card);
-                        if (skipPlayers) this.SetNextPlayer();
-                    }
-
-                    this.SetNextPlayer();
-
-                    // player sent all his cards => player won
-                    if (player.cards.isEmpty()) {
-                        this.curr_player = index;
-                        this.deck.reset();
-                        this.table.clear();
-                        this.table.add(this.deck.drawCard());
-                        for (var it : this.players) {
-                            it.cards = this.deck.drawCards(5);
-                        }
-                    }
-                }
+            if (are_same_rank && is_compatible_hand) {
+                player.RemoveCards(given_cards);
+                this.table.addAll(given_cards);
+                var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
+                this.SetNextPlayer();
+                if (!skipPlayers) return;
+                this.curr_player += given_cards.size();
+                this.curr_player %= this.players.size();
             }
         }
-
-        var next_player = this.players.get(this.curr_player);
-        if(this.umflaturi >0&& next_player.cards.stream().noneMatch(card->
-                Objects.equals(card.get(0), "2")
-                        || Objects.equals(card.get(0), "3")
-                        || Objects.equals(card.get(0), "4")))
-        {
-            next_player.cards.addAll(this.deck.drawCards(this.umflaturi));
-            this.umflaturi = 0;
-            this.SetNextPlayer();
-        }
     }
+
     @Override
     public void onMessage(WebSocket conn, String message) {
         System.out.println("Message from player: " + message);
@@ -219,8 +195,31 @@ public class GameServer extends WebSocketServer {
             }
         }
 
+
+
         this.HandleRequests(letter, _player, i);
 
+        // player has won
+        if (_player.cards.isEmpty()) {
+            this.curr_player = i;
+            this.deck.reset();
+            this.table.clear();
+            this.table.add(this.deck.drawCard());
+            for (var it : this.players) {
+                it.cards = this.deck.drawCards(5);
+            }
+        }
+
+        // next player has no cards to counter umflaturi anyway
+        var next_player = this.players.get(this.curr_player);
+        if (this.umflaturi > 0 && next_player.cards.stream().noneMatch(card ->
+                Objects.equals(card.get(0), "2")
+                        || Objects.equals(card.get(0), "3")
+                        || Objects.equals(card.get(0), "4"))) {
+            next_player.cards.addAll(this.deck.drawCards(this.umflaturi));
+            this.umflaturi = 0;
+            this.SetNextPlayer();
+        }
         this.UpdateClientsState();
     }
 
