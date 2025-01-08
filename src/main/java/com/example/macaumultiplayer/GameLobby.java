@@ -176,7 +176,7 @@ this.table_ui.getChildren().clear();
             imageView.setOnMouseClicked(event -> {
                 if (!this.isMyTurn) return;
                 if (event.isControlDown()) {
-                    cardSenderLetter.cards.add(card);
+                    if (imageView.getScaleY() != 0.6) cardSenderLetter.cards.add(card);
                 } else {
                     // prevent duplicate send of same card
                     if (imageView.getScaleY() != 0.6) cardSenderLetter.cards.add(card);

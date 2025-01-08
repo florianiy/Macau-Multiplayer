@@ -50,6 +50,7 @@ public class GameServer extends WebSocketServer {
 
     private ArrayList<ArrayList<String>> SuitChanger;
     private ArrayList<Integer> dummyCards = new ArrayList<Integer>();
+
     private ArrayList<ArrayList<String>> CreateTempSuit() {
         var suit = new ArrayList<ArrayList<String>>();
         var hearts = new ArrayList<String>();
@@ -202,7 +203,7 @@ public class GameServer extends WebSocketServer {
             }
 
 
-            // the changed suit card changes the topcard, and i must restore it to previous,
+            // the changed suit card changes the topcard, and I must restore it to previous,
             // or else it might affect reshufling of table cards into deck later anyway
             // only the latest dummy card is removed if 7 is given by more players next turn
             if (player.hasChangeSuitAbillity) {
@@ -250,37 +251,41 @@ public class GameServer extends WebSocketServer {
     @Override
     public void onMessage(WebSocket conn, String message) {
         System.out.println("Message from player: " + message);
+
+        var i = this.getPlayerIndexByWsConn(conn);
+
+        if(i<0) return;
+
+        var player = this.players.get(i);
+        var letter = this.ParseLetter(message);
+
+        this.HandleRequests(letter, player, i);
+        this.HandleWinning(player, i);
+        this.HandleDefencelessUmflaturi();
+
+        this.UpdateClientsState();
+    }
+
+    private Integer getPlayerIndexByWsConn(WebSocket conn) {
+        int i = 0;
+        for (; i < this.players.size(); i++) {
+            var player = this.players.get(i);
+            if (player.conn.equals(conn)) return i;
+        }
+        return -1;
+    }
+
+    private Letter ParseLetter(String message) {
         var letter = new Letter();
         try {
             letter = objectMapper.readValue(message, Letter.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
+        return  letter;
+    }
 
-        // get player who requested
-        Player _player = null;
-        int i = 0;
-        for (; i < this.players.size(); i++) {
-            var player = this.players.get(i);
-            if (player.conn.equals(conn)) {
-                _player = player;
-                break;
-            }
-        }
-
-        this.HandleRequests(letter, _player, i);
-
-        // player has won
-        if (_player.cards.isEmpty()) {
-            this.curr_player = i;
-            this.deck.reset();
-            this.table.clear();
-            this.table.add(this.deck.drawCard());
-            for (var it : this.players) {
-                it.cards = this.deck.drawCards(START_CARDS_AMOUNT);
-            }
-        }
-
+    private void HandleDefencelessUmflaturi() {
         // next player has no cards to counter umflaturi anyway
         var next_player = this.players.get(this.curr_player);
         if (this.umflaturi > 0 && next_player.cards.stream().noneMatch(card ->
@@ -291,7 +296,21 @@ public class GameServer extends WebSocketServer {
             this.umflaturi = 0;
             this.SetNextPlayer();
         }
-        this.UpdateClientsState();
+    }
+
+    private void HandleWinning(Player player, int i) {
+        if(player == null) return;
+        // player has won
+
+        if (player.cards.isEmpty()) {
+            this.curr_player = i;
+            this.deck.reset();
+            this.table.clear();
+            this.table.add(this.deck.drawCard());
+            for (var it : this.players) {
+                it.cards = this.deck.drawCards(START_CARDS_AMOUNT);
+            }
+        }
     }
 
     @Override
