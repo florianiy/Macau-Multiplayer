@@ -18,6 +18,7 @@ public class GameServer extends WebSocketServer {
         public ArrayList<ArrayList<String>> cards;
         public String id = "";
         WebSocket conn;
+        public boolean hasChangeSuitAbillity = false;
 
         Player(String id, WebSocket conn, ArrayList<ArrayList<String>> cards) {
             this.cards = cards;
@@ -29,6 +30,7 @@ public class GameServer extends WebSocketServer {
             for (var card : givenCards)
                 this.cards.remove(card);
         }
+
     }
 
     private List<Player> players = new ArrayList<Player>();
@@ -74,8 +76,11 @@ public class GameServer extends WebSocketServer {
             letter.player_turn = this.GetCurrPlayerId();
             letter.table = this.table;
             for (var other : this.players) {
-                if (!Objects.equals(other.id, player.id))
-                    letter.players.add(new Letter.PlayerInfo(other.id, other.cards.size()));
+                if (!Objects.equals(other.id, player.id)) {
+                    var size = other.cards.size();
+                    if (other.hasChangeSuitAbillity) size = this.SuitChanger.size();
+                    letter.players.add(new Letter.PlayerInfo(other.id, size));
+                }
             }
 
             String json;
@@ -88,10 +93,12 @@ public class GameServer extends WebSocketServer {
         }
     }
 
+    private final Integer START_CARDS_AMOUNT = 10;
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         System.out.println("New player connected: " + conn.getRemoteSocketAddress());
-        var player = new Player(UUID.randomUUID().toString(), conn, this.deck.drawCards(5));
+        var player = new Player(UUID.randomUUID().toString(), conn, this.deck.drawCards(START_CARDS_AMOUNT));
         players.add(player);
         if (this.curr_player == -1) this.curr_player = 0;
         this.UpdateClientsState();
@@ -109,6 +116,9 @@ public class GameServer extends WebSocketServer {
 
     private BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
             Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
+
+    private ArrayList<ArrayList<String>> SuitChanger;
+    private Integer dummyCard = -1;
 
     public void HandleRequests(Letter letter, Player player, Integer index) {
         if (player == null) return;
@@ -140,7 +150,8 @@ public class GameServer extends WebSocketServer {
             var is_compatible_hand = this.are_compatible_cards.test(this.getTopCard(), _card);
             var has_umflaturi = are_same_rank && Objects.equals(_card.get(0), "2") || Objects.equals(_card.get(0), "3");
             var has_blocker = are_same_rank && Objects.equals(_card.get(0), "4");
-
+            var skipPlayers = are_same_rank && Objects.equals(this.ace.get(0), _card.get(0));
+            var changeSuit = are_same_rank && Objects.equals(_card.get(0), "7");
 
             // he gave cards after he was umflat
             if (this.umflaturi > 0) {
@@ -149,6 +160,7 @@ public class GameServer extends WebSocketServer {
                 player.RemoveCards(given_cards);
                 this.table.addAll(given_cards);
                 this.SetNextPlayer();
+                this.RemoveAnyDummyCard();
                 return;
             }
 
@@ -158,19 +170,83 @@ public class GameServer extends WebSocketServer {
                 player.RemoveCards(given_cards);
                 this.table.addAll(given_cards);
                 this.SetNextPlayer();
+                this.RemoveAnyDummyCard();
+                return;
+            }
+
+            // frontend expects blockers to be allowed above any card
+            if (has_blocker) {
+                player.RemoveCards(given_cards);
+                this.table.addAll(given_cards);
+                this.SetNextPlayer();
+                this.RemoveAnyDummyCard();
+                return;
+            }
+
+
+            // the changed suit card changes the topcard, and i must restore it to previous,
+            // or else it might affect reshufling of table cards into deck later anyway
+            if (player.hasChangeSuitAbillity) {
+                var newTopCard = new ArrayList<>(this.getTopCard());
+                newTopCard.set(1, given_cards.get(0).get(1));
+                this.table.add(newTopCard);
+                this.dummyCard = this.table.size() - 1;
+                player.hasChangeSuitAbillity = false;
+                player.cards.clear();
+                player.cards.addAll(this.SuitChanger);
+                this.SetNextPlayer();
+                return;
+            }
+
+            if (changeSuit) {
+                player.RemoveCards(given_cards);
+                this.SuitChanger = new ArrayList<>(player.cards);
+                player.hasChangeSuitAbillity = true;
+                player.cards.clear();
+                player.cards.addAll(this.CreateTempSuit());
                 return;
             }
 
             if (are_same_rank && is_compatible_hand) {
+                this.RemoveAnyDummyCard();
                 player.RemoveCards(given_cards);
                 this.table.addAll(given_cards);
-                var skipPlayers = Objects.equals(this.ace.get(0), _card.get(0));
+                if (skipPlayers) {
+                    this.curr_player += given_cards.size();
+                    this.curr_player %= this.players.size();
+                    return;
+                }
                 this.SetNextPlayer();
-                if (!skipPlayers) return;
-                this.curr_player += given_cards.size();
-                this.curr_player %= this.players.size();
             }
         }
+    }
+
+    private void RemoveAnyDummyCard() {
+        if (this.dummyCard > 0) {
+            this.table.remove((int)this.dummyCard);
+            this.dummyCard = -1;
+        }
+    }
+
+    private ArrayList<ArrayList<String>> CreateTempSuit() {
+        var suit = new ArrayList<ArrayList<String>>();
+        var hearts = new ArrayList<String>();
+        hearts.add("ace");
+        hearts.add("hearts");
+        var clubs = new ArrayList<String>();
+        clubs.add("ace");
+        clubs.add("clubs");
+        var spades = new ArrayList<String>();
+        spades.add("ace");
+        spades.add("spades");
+        var diamonds = new ArrayList<String>();
+        diamonds.add("ace");
+        diamonds.add("diamonds");
+        suit.add(hearts);
+        suit.add(spades);
+        suit.add(diamonds);
+        suit.add(clubs);
+        return suit;
     }
 
     @Override
@@ -183,7 +259,6 @@ public class GameServer extends WebSocketServer {
             throw new RuntimeException(e);
         }
 
-
         // get player who requested
         Player _player = null;
         int i = 0;
@@ -195,8 +270,6 @@ public class GameServer extends WebSocketServer {
             }
         }
 
-
-
         this.HandleRequests(letter, _player, i);
 
         // player has won
@@ -206,7 +279,7 @@ public class GameServer extends WebSocketServer {
             this.table.clear();
             this.table.add(this.deck.drawCard());
             for (var it : this.players) {
-                it.cards = this.deck.drawCards(5);
+                it.cards = this.deck.drawCards(START_CARDS_AMOUNT);
             }
         }
 

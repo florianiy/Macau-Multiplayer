@@ -96,6 +96,7 @@ public class GameLobby extends Application {
             var umflaturi = Objects.equals(thiscard.get(0), "2") || Objects.equals(thiscard.get(0), "3");
             // blockeru se da peste orice chiar daca nu esti umflat momentan in backend
             var blocker = Objects.equals(thiscard.get(0), "4");
+            var suitChanger = Objects.equals(thiscard.get(0), "7");
             var sameRank = false;
 
             for (var ccard : compatibles) {
@@ -105,7 +106,7 @@ public class GameLobby extends Application {
                 }
             }
             if(topCardCompatible) compatibles.add(thiscard);
-            if(topCardCompatible || sameRank || umflaturi || blocker) {
+            if(topCardCompatible || sameRank || umflaturi || blocker || suitChanger) {
                 illy_map.put(i%tsize, true);
             }
         }
