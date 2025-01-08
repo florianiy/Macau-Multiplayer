@@ -203,9 +203,10 @@ public class GameServer extends WebSocketServer {
             }
 
 
-            // the changed suit card changes the topcard, and I must restore it to previous,
-            // or else it might affect reshufling of table cards into deck later anyway
-            // only the latest dummy card is removed if 7 is given by more players next turn
+            // all dummies are removed and it works perfectly => just be careful when reshufling
+            // so that you dont reshufle before removing dummy
+            // !!! potential issue, all draw instead of give until deck is empty => remove dummys,
+            //  => and reindex last dummy, so even if they draw infinetely it works n-rec-times
             if (player.hasChangeSuitAbillity) {
                 var newTopCard = new ArrayList<>(this.getTopCard());
                 newTopCard.set(1, given_cards.get(0).get(1));
