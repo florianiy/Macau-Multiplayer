@@ -3,11 +3,9 @@ package com.example.macaumultiplayer;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.function.BiPredicate;
-import java.util.function.Function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import javafx.application.Platform;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -48,6 +46,30 @@ public class GameServer extends WebSocketServer {
     private final ArrayList<String> ace;
     //    private ArrayList<String> four;
     private Integer umflaturi = 0;
+    private final Integer START_CARDS_AMOUNT = 10;
+
+    private ArrayList<ArrayList<String>> SuitChanger;
+    private ArrayList<Integer> dummyCards = new ArrayList<Integer>();
+    private ArrayList<ArrayList<String>> CreateTempSuit() {
+        var suit = new ArrayList<ArrayList<String>>();
+        var hearts = new ArrayList<String>();
+        hearts.add("ace");
+        hearts.add("hearts");
+        var clubs = new ArrayList<String>();
+        clubs.add("ace");
+        clubs.add("clubs");
+        var spades = new ArrayList<String>();
+        spades.add("ace");
+        spades.add("spades");
+        var diamonds = new ArrayList<String>();
+        diamonds.add("ace");
+        diamonds.add("diamonds");
+        suit.add(hearts);
+        suit.add(spades);
+        suit.add(diamonds);
+        suit.add(clubs);
+        return suit;
+    }
 
     public GameServer(int port) {
         super(new InetSocketAddress(port));
@@ -93,7 +115,6 @@ public class GameServer extends WebSocketServer {
         }
     }
 
-    private final Integer START_CARDS_AMOUNT = 10;
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
@@ -116,9 +137,6 @@ public class GameServer extends WebSocketServer {
 
     private BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
             Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
-
-    private ArrayList<ArrayList<String>> SuitChanger;
-    private Integer dummyCard = -1;
 
     public void HandleRequests(Letter letter, Player player, Integer index) {
         if (player == null) return;
@@ -186,11 +204,12 @@ public class GameServer extends WebSocketServer {
 
             // the changed suit card changes the topcard, and i must restore it to previous,
             // or else it might affect reshufling of table cards into deck later anyway
+            // only the latest dummy card is removed if 7 is given by more players next turn
             if (player.hasChangeSuitAbillity) {
                 var newTopCard = new ArrayList<>(this.getTopCard());
                 newTopCard.set(1, given_cards.get(0).get(1));
                 this.table.add(newTopCard);
-                this.dummyCard = this.table.size() - 1;
+                this.dummyCards.add(this.table.size() - 1);
                 player.hasChangeSuitAbillity = false;
                 player.cards.clear();
                 player.cards.addAll(this.SuitChanger);
@@ -211,43 +230,22 @@ public class GameServer extends WebSocketServer {
                 this.RemoveAnyDummyCard();
                 player.RemoveCards(given_cards);
                 this.table.addAll(given_cards);
+                this.SetNextPlayer();
                 if (skipPlayers) {
                     this.curr_player += given_cards.size();
                     this.curr_player %= this.players.size();
-                    return;
                 }
-                this.SetNextPlayer();
             }
         }
     }
 
     private void RemoveAnyDummyCard() {
-        if (this.dummyCard > 0) {
-            this.table.remove((int)this.dummyCard);
-            this.dummyCard = -1;
-        }
+        // when you remove the index decreasez :(((((((
+        for (int i = this.dummyCards.size() - 1; i >= 0; i--)
+            this.table.remove((int) (this.dummyCards.get(i)));
+        this.dummyCards.clear();
     }
 
-    private ArrayList<ArrayList<String>> CreateTempSuit() {
-        var suit = new ArrayList<ArrayList<String>>();
-        var hearts = new ArrayList<String>();
-        hearts.add("ace");
-        hearts.add("hearts");
-        var clubs = new ArrayList<String>();
-        clubs.add("ace");
-        clubs.add("clubs");
-        var spades = new ArrayList<String>();
-        spades.add("ace");
-        spades.add("spades");
-        var diamonds = new ArrayList<String>();
-        diamonds.add("ace");
-        diamonds.add("diamonds");
-        suit.add(hearts);
-        suit.add(spades);
-        suit.add(diamonds);
-        suit.add(clubs);
-        return suit;
-    }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
