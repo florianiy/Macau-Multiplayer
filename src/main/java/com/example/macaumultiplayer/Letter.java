@@ -11,6 +11,7 @@ public class Letter {
     public ArrayList<ArrayList<String>> cards = new ArrayList<ArrayList<String>>();
     public ArrayList<PlayerInfo> players = new ArrayList<PlayerInfo>();
     public ArrayList<String> top_card;
+    public ArrayList<ArrayList<String>> table;
     public Integer CardsDeckLeft = 50;
     public String player_turn = "";
     public String your_id = "";

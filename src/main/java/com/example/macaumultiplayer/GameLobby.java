@@ -14,10 +14,11 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
+import java.io.Console;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.ArrayList;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.BiPredicate;
 
 public class GameLobby extends Application {
 
@@ -79,8 +80,39 @@ public class GameLobby extends Application {
     Boolean isMyTurn = false;
 
     Letter cardSenderLetter = new Letter();
+    BiPredicate<ArrayList<String>, ArrayList<String>> are_compatible_cards = (a, b) ->
+            Objects.equals(a.get(0), b.get(0)) || Objects.equals(a.get(1), b.get(1));
 
 
+    public Map<Integer, Boolean> GetValidCardsIntellisense(Letter letter){
+        var compatibles = new ArrayList<ArrayList<String>>();
+        compatibles.add(letter.top_card);
+        var tsize = letter.cards.size();
+        Map<Integer, Boolean> illy_map = new HashMap<>();
+        for (int i = 0; i < tsize *2 ; i++) {
+
+            var thiscard = letter.cards.get(i %tsize);
+            var topCardCompatible = this.are_compatible_cards.test(letter.top_card, thiscard);
+            var umflaturi = Objects.equals(thiscard.get(0), "2") || Objects.equals(thiscard.get(0), "3");
+            // blockeru se da peste orice chiar daca nu esti umflat momentan in backend
+            var blocker = Objects.equals(thiscard.get(0), "4");
+            var sameRank = false;
+
+            for (var ccard : compatibles) {
+                if (Objects.equals(ccard.get(0), thiscard.get(0))) {
+                    sameRank = true;
+                    break;
+                }
+            }
+            if(topCardCompatible) compatibles.add(thiscard);
+            if(topCardCompatible || sameRank || umflaturi || blocker) {
+                illy_map.put(i%tsize, true);
+            }
+        }
+    return illy_map;
+    }
+
+    Pane table_ui;
     public void UpdateGame(Letter letter) {
         if (!Objects.equals(letter.action, "update-state"))
             return;
@@ -98,8 +130,23 @@ public class GameLobby extends Application {
         // add this player id
         playerText.setText("Let's Go <" + letter.your_id + ">");
         // topcard
-        top_hbox.getChildren().set(0, this.getCardImage(letter.top_card));
 
+//        top_hbox.getChildren().set(0, this.getCardImage(letter.top_card));
+
+this.table_ui.getChildren().clear();
+        Random random = new Random();
+
+        int jj =0;
+        for (var table_card: letter.table) {
+            var hiddenCard = this.getCardImage(table_card);
+            hiddenCard.setLayoutX(10+jj * 0.2 *  (random.nextBoolean() ? 1 : -1));
+            hiddenCard.setRotate(random.nextInt(20) * (random.nextBoolean() ? 1 : -1));
+            hiddenCard.setLayoutY(-jj * 0.2 * (random.nextBoolean() ? 1 : -1));
+
+            table_ui.getChildren().add(hiddenCard);
+            jj++;
+
+        }
 
         while (this.deck_ui.getChildren().size() >= letter.CardsDeckLeft) {
             this.deck_ui.getChildren().remove(letter.CardsDeckLeft - 1);
@@ -110,13 +157,20 @@ public class GameLobby extends Application {
         // card hbox
         Pane pane = new Pane();
         AllCards.getChildren().add(pane);
+        // card intelli sense
+        ColorAdjust grayscale = new ColorAdjust();
+        grayscale.setSaturation(-1);
+        var illy_map = this.GetValidCardsIntellisense(letter);
+        System.out.println(illy_map);
         for (int i = 0; i < letter.cards.size(); i++) {
+
             var card = letter.cards.get(i);
             if (card == null) break;
             var imageView = this.getCardImage(card);
             imageView.setLayoutX(i * 40);
             pane.getChildren().add(imageView);
 
+            if(!illy_map.containsKey(i)) imageView.setOpacity(.3);
 
             imageView.setOnMouseClicked(event -> {
                 if (!this.isMyTurn) return;
@@ -124,7 +178,7 @@ public class GameLobby extends Application {
                     cardSenderLetter.cards.add(card);
                 } else {
                     // prevent duplicate send of same card
-                    if(imageView.getScaleY() != 0.6) cardSenderLetter.cards.add(card);
+                    if (imageView.getScaleY() != 0.6) cardSenderLetter.cards.add(card);
                     this.gameClient.send(this.ToJson(cardSenderLetter));
                     cardSenderLetter.cards.clear();
                 }
@@ -132,6 +186,9 @@ public class GameLobby extends Application {
 
             });
         }
+
+
+
 
         for (var player : letter.players) {
             Pane fp = new Pane();
@@ -164,16 +221,23 @@ public class GameLobby extends Application {
 
         this.cardSenderLetter.action = "give";
         // tophbox
-        var card = new ArrayList<String>();
-        card.add("ace");
-        card.add("hearts");
-        top_hbox.getChildren().add(this.getCardImage(card));
+//        var card = new ArrayList<String>();
+//        card.add("ace");
+//        card.add("hearts");
+
+        table_ui = new Pane();
+
+
+        top_hbox.getChildren().add(table_ui);
         // deck of cards where player can draw cards
         deck_ui = new Pane();
+        Random random = new Random();
+
         for (int i = 0; i < this.LastDeckAmount; i++) {
             var hiddenCard = this.getImageView("/cards/hidden-card.png");
-            hiddenCard.setLayoutX(i * 2.5);
-            hiddenCard.setLayoutY(-i * 0.5);
+            hiddenCard.setLayoutX(100+i * 0.1 *  (random.nextBoolean() ? 1 : -1));
+            hiddenCard.setRotate(random.nextInt(10) * (random.nextBoolean() ? 1 : -1));
+            hiddenCard.setLayoutY(-i * 0.1 * (random.nextBoolean() ? 1 : -1));
             hiddenCard.setOnMouseClicked(event -> {
                 if (!this.isMyTurn) return;
                 var let = new Letter();
@@ -182,7 +246,9 @@ public class GameLobby extends Application {
             });
             deck_ui.getChildren().add(hiddenCard);
         }
+
         top_hbox.getChildren().add(deck_ui);
+
 
         try {
             this.gameClient = new GameClient(12334);
