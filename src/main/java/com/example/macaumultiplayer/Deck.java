@@ -49,4 +49,9 @@ public class Deck {
         // add jockers red_jocker + black_jocker
         Collections.shuffle(cards);
     }
+
+    public void RecycleCards(ArrayList<ArrayList<String>> _cards) {
+        this.cards.addAll(_cards);
+        Collections.shuffle(this.cards);
+    }
 }

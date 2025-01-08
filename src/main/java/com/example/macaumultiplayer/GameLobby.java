@@ -315,6 +315,11 @@ this.table_ui.getChildren().clear();
         primaryStage.show();
     }
 
+    @Override
+    public void stop() throws Exception {
+        super.stop();
+        this.gameClient.close();
+    }
 
     public static void main(String[] args) {
         launch(args);

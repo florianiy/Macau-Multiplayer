@@ -43,10 +43,8 @@ public class GameServer extends WebSocketServer {
     }
 
     ObjectMapper objectMapper = new ObjectMapper();
-    private final ArrayList<String> ace;
-    //    private ArrayList<String> four;
     private Integer umflaturi = 0;
-    private final Integer START_CARDS_AMOUNT = 10;
+    private final Integer START_CARDS_AMOUNT = 5;
 
     private ArrayList<ArrayList<String>> SuitChanger;
     private ArrayList<Integer> dummyCards = new ArrayList<Integer>();
@@ -75,9 +73,7 @@ public class GameServer extends WebSocketServer {
     public GameServer(int port) {
         super(new InetSocketAddress(port));
         this.table.add(this.deck.drawCard());
-        this.ace = new ArrayList<String>();
-        this.ace.add("ace");
-        this.ace.add("clubs");
+
     }
 
     public void setOnStartCallback(Runnable callback) {
@@ -90,6 +86,7 @@ public class GameServer extends WebSocketServer {
 
     public void UpdateClientsState() {
         for (var player : this.players) {
+            player.cards.sort(Comparator.comparing(o -> o.get(0)));
             Letter letter = new Letter();
             letter.action = "update-state";
             letter.your_id = player.id;
@@ -129,6 +126,11 @@ public class GameServer extends WebSocketServer {
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         System.out.println("Player disconnected: " + conn.getRemoteSocketAddress());
+        var i = this.getPlayerIndexByWsConn(conn);
+        this.deck.RecycleCards(this.players.get(i).cards);
+        this.players.remove((int)i);
+        this.UpdateClientsState();
+
         // handle remove player
     }
 
@@ -169,7 +171,7 @@ public class GameServer extends WebSocketServer {
             var is_compatible_hand = this.are_compatible_cards.test(this.getTopCard(), _card);
             var has_umflaturi = are_same_rank && Objects.equals(_card.get(0), "2") || Objects.equals(_card.get(0), "3");
             var has_blocker = are_same_rank && Objects.equals(_card.get(0), "4");
-            var skipPlayers = are_same_rank && Objects.equals(this.ace.get(0), _card.get(0));
+            var skipPlayers = are_same_rank && Objects.equals("ace", _card.get(0));
             var changeSuit = are_same_rank && Objects.equals(_card.get(0), "7");
 
             // he gave cards after he was umflat
@@ -287,6 +289,9 @@ public class GameServer extends WebSocketServer {
     }
 
     private void HandleDefencelessUmflaturi() {
+        // in case all disconnect but this one player
+        if(this.curr_player >= this.players.size()) return;
+
         // next player has no cards to counter umflaturi anyway
         var next_player = this.players.get(this.curr_player);
         if (this.umflaturi > 0 && next_player.cards.stream().noneMatch(card ->
