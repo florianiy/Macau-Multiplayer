@@ -71,7 +71,7 @@ public class GameServer extends WebSocketServer {
     }
 
     public GameServer(int port) {
-        super(new InetSocketAddress(port));
+        super(new InetSocketAddress("0.0.0.0",port));
         this.table.add(this.deck.drawCard());
 
     }
