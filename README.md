@@ -9,7 +9,9 @@ features:
  - beautifull animations
  - deck and table cards are randomly offset and rotated ↩️
 
-
+please wait for demo to load ..... :))
+----
+<img src="demo-macau-mult.gif" width="600px" alt="demo is loading"/>
 comming soon:
 
  - endless⏳ recycling♻️ and reshufling🔀 of table cards♠️♥️
